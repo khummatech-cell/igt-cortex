@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>IGT Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>.hidden { display: none; }</style>
+</head>
+<body class="bg-gray-100 font-sans h-screen flex flex-col">
+
+    <!-- AUTH SCREEN -->
+    <div id="auth-screen" class="fixed inset-0 bg-gray-900 flex items-center justify-center z-50">
+        <div class="bg-white p-8 rounded-xl w-96 shadow-2xl">
+            <div class="text-center mb-6">
+                <h1 class="text-2xl font-bold text-blue-600">IGT CORTEX</h1>
+                <p class="text-gray-500 text-sm">Enterprise Login</p>
+            </div>
+            
+            <div id="login-form">
+                <input id="l-email" class="w-full p-3 border rounded mb-3" placeholder="Email">
+                <input id="l-pass" type="password" class="w-full p-3 border rounded mb-4" placeholder="Password">
+                <button onclick="login()" class="w-full bg-blue-600 text-white p-3 rounded font-bold">LOGIN</button>
+                <p class="text-center mt-4 text-sm text-blue-500 cursor-pointer" onclick="toggleAuth()">Create Organization Account</p>
+            </div>
+
+            <div id="signup-form" class="hidden">
+                <input id="s-org" class="w-full p-3 border rounded mb-3" placeholder="Organization Name">
+                <input id="s-name" class="w-full p-3 border rounded mb-3" placeholder="Your Full Name">
+                <input id="s-email" class="w-full p-3 border rounded mb-3" placeholder="Email">
+                <input id="s-pass" type="password" class="w-full p-3 border rounded mb-4" placeholder="Password">
+                <button onclick="signup()" class="w-full bg-green-600 text-white p-3 rounded font-bold">REGISTER AGENCY</button>
+                <p class="text-center mt-4 text-sm text-blue-500 cursor-pointer" onclick="toggleAuth()">Back to Login</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP (HIDDEN UNTIL LOGIN) -->
+    <div id="app-ui" class="flex-1 flex hidden">
+        
+        <!-- SIDEBAR -->
+        <div class="w-64 bg-gray-900 text-gray-300 flex flex-col">
+            <div class="p-4 border-b border-gray-800 font-bold text-white flex items-center gap-2">
+                <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center">I</div>
+                <span id="org-name-display">IGT ORG</span>
+            </div>
+            
+            <nav class="flex-1 p-2 space-y-1">
+                <a onclick="showSection('chats')" class="block p-3 hover:bg-gray-800 rounded cursor-pointer text-white bg-gray-800"><i class="fas fa-comments w-6"></i> Live Chats</a>
+                <a onclick="showSection('contacts')" class="block p-3 hover:bg-gray-800 rounded cursor-pointer"><i class="fas fa-address-book w-6"></i> CRM & Broadcast</a>
+                <a onclick="showSection('team')" class="block p-3 hover:bg-gray-800 rounded cursor-pointer"><i class="fas fa-users w-6"></i> Team & Roles</a>
+                <a onclick="showSection('properties')" class="block p-3 hover:bg-gray-800 rounded cursor-pointer"><i class="fas fa-layer-group w-6"></i> Properties</a>
+                <a onclick="showSection('reports')" class="block p-3 hover:bg-gray-800 rounded cursor-pointer"><i class="fas fa-chart-line w-6"></i> Reports</a>
+            </nav>
+
+            <div class="p-4 border-t border-gray-800">
+                <div class="flex items-center gap-3">
+                    <img id="my-avatar" src="" class="w-10 h-10 rounded-full border border-gray-600">
+                    <div>
+                        <div id="my-name" class="text-sm font-bold text-white">Agent</div>
+                        <div class="text-xs text-green-500">● Online</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CONTENT AREA -->
+        <div class="flex-1 flex overflow-hidden relative">
+            
+            <!-- SECTION: LIVE CHATS -->
+            <div id="sec-chats" class="section flex-1 flex">
+                <div class="w-80 bg-white border-r flex flex-col">
+                    <div class="p-4 font-bold border-b">Open Conversations</div>
+                    <div id="chat-list" class="flex-1 overflow-y-auto"></div>
+                </div>
+                <div class="flex-1 flex flex-col bg-gray-50">
+                    <!-- VISITOR INFO HEADER -->
+                    <div id="chat-info" class="hidden bg-white p-4 border-b shadow-sm flex justify-between">
+                        <div>
+                            <h3 class="font-bold text-lg" id="v-name">Visitor</h3>
+                            <div class="text-xs text-gray-500 flex gap-4">
+                                <span><i class="fas fa-map-marker-alt"></i> <span id="v-loc">Unknown</span></span>
+                                <span><i class="fas fa-clock"></i> <span id="v-time">--:--</span></span>
+                                <span><i class="fas fa-network-wired"></i> <span id="v-ip">127.0.0.1</span></span>
+                            </div>
+                        </div>
+                        <button onclick="closeChat()" class="text-green-600 border border-green-200 px-3 py-1 rounded hover:bg-green-50">Close Ticket</button>
+                    </div>
+
+                    <div id="messages" class="flex-1 p-6 overflow-y-auto space-y-3">
+                        <div class="text-center text-gray-400 mt-20">Select a chat to begin</div>
+                    </div>
+
+                    <div id="input-area" class="hidden p-4 bg-white border-t flex gap-2">
+                        <input id="msg-in" class="flex-1 p-3 border rounded" placeholder="Type message...">
+                        <button onclick="send()" class="bg-blue-600 text-white px-6 rounded font-bold">SEND</button>
+                        <button onclick="sendOffline()" class="bg-gray-200 text-gray-600 px-3 rounded" title="Send to Email (Offline)"><i class="fas fa-envelope"></i></button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION: TEAM MANAGEMENT -->
+            <div id="sec-team" class="section hidden flex-1 p-10 overflow-y-auto">
+                <h2 class="text-2xl font-bold mb-6">Team Management</h2>
+                
+                <div class="bg-white p-6 rounded shadow mb-8">
+                    <h3 class="font-bold mb-4">Add New Agent</h3>
+                    <div class="grid grid-cols-4 gap-4">
+                        <input id="a-name" placeholder="Name" class="p-2 border rounded">
+                        <input id="a-email" placeholder="Email" class="p-2 border rounded">
+                        <input id="a-pass" placeholder="Password" class="p-2 border rounded">
+                        <button onclick="addAgent()" class="bg-green-600 text-white rounded font-bold">Add User</button>
+                    </div>
+                    <div class="mt-2 text-sm">
+                        <label><input type="checkbox" id="perm-chat" checked> Chat</label>
+                        <label class="ml-4"><input type="checkbox" id="perm-admin"> Admin Access</label>
+                    </div>
+                </div>
+
+                <h3 class="font-bold mb-4">Staff Directory</h3>
+                <div id="team-list" class="grid grid-cols-3 gap-4"></div>
+            </div>
+
+            <!-- SECTION: PROPERTIES (TOOLS) -->
+            <div id="sec-properties" class="section hidden flex-1 p-10">
+                <h2 class="text-2xl font-bold mb-6">Client Properties</h2>
+                <div class="flex gap-4 mb-6">
+                    <input id="p-name" placeholder="Website Name" class="p-3 border rounded flex-1">
+                    <input id="p-url" placeholder="URL" class="p-3 border rounded flex-1">
+                    <button onclick="addProperty()" class="bg-blue-600 text-white px-6 rounded font-bold">Create Property</button>
+                </div>
+                
+                <div class="bg-white rounded shadow overflow-hidden">
+                    <table class="w-full text-left">
+                        <thead class="bg-gray-100"><tr><th class="p-4">ID</th><th class="p-4">Name</th><th class="p-4">Widget Script</th></tr></thead>
+                        <tbody id="prop-list"></tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- SECTION: CRM -->
+             <div id="sec-contacts" class="section hidden flex-1 p-10">
+                <h2 class="text-2xl font-bold mb-6">CRM & Broadcast</h2>
+                <div class="bg-blue-50 p-6 rounded border border-blue-200 mb-6">
+                    <h3 class="font-bold text-blue-800 mb-2">Send Promo Blast</h3>
+                    <textarea id="promo-text" class="w-full p-3 border rounded mb-2" placeholder="Write your message to all contacts..."></textarea>
+                    <button onclick="sendBroadcast()" class="bg-blue-600 text-white px-4 py-2 rounded font-bold">Send to All Contacts</button>
+                </div>
+                <div id="contact-list" class="bg-white rounded shadow p-4 h-96 overflow-y-auto"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let currentUser = null;
+        let currentRoom = null;
+
+        // --- AUTH LOGIC ---
+        function toggleAuth() {
+            document.getElementById('login-form').classList.toggle('hidden');
+            document.getElementById('signup-form').classList.toggle('hidden');
+        }
+
+        async function signup() {
+            const res = await fetch('/api/auth/signup', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({
+                    orgName: document.getElementById('s-org').value,
+                    name: document.getElementById('s-name').value,
+                    email: document.getElementById('s-email').value,
+                    password: document.getElementById('s-pass').value
+                })
+            });
+            const data = await res.json();
+            if(data.user) { alert("Registered! Please Login."); toggleAuth(); }
+        }
+
+        async function login() {
+            const res = await fetch('/api/auth/login', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({
+                    email: document.getElementById('l-email').value,
+                    password: document.getElementById('l-pass').value
+                })
+            });
+            if(res.ok) {
+                currentUser = await res.json();
+                document.getElementById('auth-screen').classList.add('hidden');
+                document.getElementById('app-ui').classList.remove('hidden');
+                initDashboard();
+            } else {
+                alert("Login Failed or Account Suspended");
+            }
+        }
+
+        // --- DASHBOARD LOGIC ---
+        async function initDashboard() {
+            document.getElementById('my-name').innerText = currentUser.name;
+            document.getElementById('my-avatar').src = currentUser.avatar;
+
+            // Fetch Org Data
+            const res = await fetch(`/api/dashboard/${currentUser.id}`);
+            const data = await res.json();
+            
+            document.getElementById('org-name-display').innerText = data.org.name;
+            
+            // Render Team
+            const teamList = document.getElementById('team-list');
+            teamList.innerHTML = '';
+            data.team.forEach(u => {
+                teamList.innerHTML += `
+                    <div class="bg-white p-4 rounded shadow border flex items-center gap-3">
+                        <img src="${u.avatar}" class="w-10 h-10 rounded-full">
+                        <div><div class="font-bold">${u.name}</div><div class="text-xs text-gray-500">${u.role}</div></div>
+                        <button class="ml-auto text-blue-500 text-xs">Edit</button>
+                    </div>`;
+            });
+
+            // Render Properties
+            const propList = document.getElementById('prop-list');
+            propList.innerHTML = '';
+            data.properties.forEach(p => {
+                propList.innerHTML += `<tr class="border-b"><td class="p-4 font-mono text-xs">${p.id}</td><td class="p-4">${p.name}</td><td class="p-4 text-xs bg-gray-50 p-1"><code class="select-all">window.IGT_PROP_ID="${p.id}"</code></td></tr>`;
+            });
+
+            // Render Contacts
+            const contactList = document.getElementById('contact-list');
+            contactList.innerHTML = '';
+            data.contacts.forEach(c => {
+                contactList.innerHTML += `<div class="p-2 border-b flex justify-between"><span>${c.name}</span><span class="text-gray-500">${c.email}</span></div>`;
+            });
+
+            // CONNECT SOCKET
+            socket.emit('agent_login', currentUser.orgID);
+        }
+
+        // --- SECTION NAVIGATION ---
+        function showSection(id) {
+            document.querySelectorAll('.section').forEach(el => el.classList.add('hidden'));
+            document.getElementById('sec-'+id).classList.remove('hidden');
+        }
+
+        // --- ACTIONS ---
+        async function addProperty() {
+            const name = document.getElementById('p-name').value;
+            const url = document.getElementById('p-url').value;
+            await fetch('/api/property/create', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ orgID: currentUser.orgID, name, url })
+            });
+            initDashboard(); // Refresh
+        }
+
+        async function addAgent() {
+            // Logic to call /api/agent/create
+            alert("Agent Added (Simulation)");
+        }
+        
+        async function sendBroadcast() {
+            const msg = document.getElementById('promo-text').value;
+            const res = await fetch('/api/broadcast', {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({ orgID: currentUser.orgID, message: msg })
+            });
+            const d = await res.json();
+            alert(`Sent to ${d.count} contacts.`);
+        }
+
+        // --- CHAT LOGIC ---
+        socket.on('new_visitor', (chat) => {
+            const list = document.getElementById('chat-list');
+            const div = document.createElement('div');
+            div.id = `chat-${chat.id}`;
+            div.className = "p-4 border-b hover:bg-gray-50 cursor-pointer";
+            div.innerHTML = `<div class="font-bold">${chat.visitor.name}</div><div class="text-xs text-gray-500">Prop: ${chat.propertyID}</div>`;
+            div.onclick = () => openChat(chat);
+            list.prepend(div);
+            new Audio('https://codeskulptor-demos.commondatastorage.googleapis.com/pang/pop.mp3').play();
+        });
+
+        socket.on('receive_msg', (msg) => {
+            if(currentRoom) {
+                renderMsg(msg);
+            }
+        });
+
+        function openChat(chat) {
+            currentRoom = chat.id;
+            socket.emit('join_chat', chat.id);
+            
+            document.getElementById('chat-info').classList.remove('hidden');
+            document.getElementById('input-area').classList.remove('hidden');
+            document.getElementById('v-name').innerText = chat.visitor.name;
+            document.getElementById('v-ip').innerText = chat.visitor.ip;
+            document.getElementById('v-loc').innerText = `${chat.visitor.location.city}, ${chat.visitor.location.country}`;
+            document.getElementById('v-time').innerText = new Date().toLocaleTimeString();
+            
+            document.getElementById('messages').innerHTML = '';
+            chat.messages.forEach(renderMsg);
+        }
+
+        function send() {
+            const txt = document.getElementById('msg-in').value;
+            socket.emit('send_msg', { room: currentRoom, sender: 'agent', text: txt });
+            document.getElementById('msg-in').value = '';
+        }
+        
+        function sendOffline() {
+             const txt = document.getElementById('msg-in').value;
+             alert(`Sent offline email: "${txt}"`);
+             send(); // Log it in chat too
+        }
+
+        function renderMsg(msg) {
+            const area = document.getElementById('messages');
+            const isAgent = msg.sender === 'agent';
+            area.innerHTML += `<div class="flex ${isAgent?'justify-end':'justify-start'}"><div class="${isAgent?'bg-blue-600 text-white':'bg-white border'} p-3 rounded shadow-sm max-w-xs">${msg.text}</div></div>`;
+            area.scrollTop = area.scrollHeight;
+        }
+        
+        function closeChat() {
+            socket.emit('close_chat', currentRoom);
+            document.getElementById(`chat-${currentRoom}`).remove();
+            document.getElementById('chat-info').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
